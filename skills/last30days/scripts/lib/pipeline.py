@@ -82,10 +82,10 @@ def _resolve_depth_settings(depth: str, config: dict[str, Any]) -> dict[str, int
     """
     settings = dict(DEPTH_SETTINGS[depth])
     max_per_source = config.get("_max_per_source")
-    if max_per_source:
+    if max_per_source is not None:
         settings["per_stream_limit"] = int(max_per_source)
     max_results = config.get("_max_results")
-    if max_results:
+    if max_results is not None:
         settings["pool_limit"] = int(max_results)
         settings["rerank_limit"] = int(max_results)
     return settings
@@ -477,7 +477,7 @@ def run(
                 # --plan fetches, instead of only the first two.
                 cap = MAX_SOURCE_FETCHES.get(source)
                 _cap_override = config.get("_max_source_fetches")
-                if cap is not None and _cap_override:
+                if cap is not None and _cap_override is not None:
                     cap = int(_cap_override)
                 if cap is not None:
                     current = source_fetch_count.get(source, 0)

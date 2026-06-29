@@ -27,6 +27,14 @@ class DepthSettingsOverrideTests(unittest.TestCase):
         settings = pipeline._resolve_depth_settings("deep", {"_max_results": 10})
         self.assertEqual(10, settings["rerank_limit"])
 
+    def test_zero_overrides_are_preserved_as_explicit_caps(self):
+        settings = pipeline._resolve_depth_settings(
+            "deep", {"_max_per_source": 0, "_max_results": 0}
+        )
+        self.assertEqual(0, settings["per_stream_limit"])
+        self.assertEqual(0, settings["pool_limit"])
+        self.assertEqual(0, settings["rerank_limit"])
+
 
 class PipelineV3Tests(unittest.TestCase):
     def test_mock_pipeline_report_without_live_credentials(self):
@@ -263,6 +271,33 @@ class TestSourceFetchCap(unittest.TestCase):
             len(x_calls), 2,
             f"X should be fetched at most 2 times, got {len(x_calls)}",
         )
+
+    @patch("lib.pipeline._retrieve_stream")
+    def test_zero_source_fetch_override_suppresses_capped_source(self, mock_retrieve):
+        """A 0 override is explicit and should suppress capped-source submissions."""
+        mock_retrieve.side_effect = lambda **kwargs: pipeline._mock_stream_results(
+            kwargs["source"], kwargs["subquery"]
+        )
+        pipeline.run(
+            topic="compare iPhone vs Android vs Pixel vs Samsung",
+            config={
+                "LAST30DAYS_REASONING_PROVIDER": "gemini",
+                "_max_source_fetches": 0,
+            },
+            depth="quick",
+            requested_sources=["reddit", "x"],
+            mock=True,
+        )
+        x_calls = [
+            call for call in mock_retrieve.call_args_list
+            if call.kwargs.get("source") == "x"
+        ]
+        reddit_calls = [
+            call for call in mock_retrieve.call_args_list
+            if call.kwargs.get("source") == "reddit"
+        ]
+        self.assertEqual([], x_calls)
+        self.assertGreater(len(reddit_calls), 0)
 
 
 class TestRateLimitSharing(unittest.TestCase):
